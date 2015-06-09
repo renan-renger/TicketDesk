@@ -12,6 +12,7 @@
 // provided to the recipient.
 
 using System;
+using System.Collections.Generic;
 using System.Data.Entity.Migrations;
 using TicketDesk.Domain.Model;
 
@@ -19,25 +20,26 @@ namespace TicketDesk.Domain.Migrations
 {
     public static class DemoDataManager
     {
-        public static void RemoveAllData(TicketDeskContext context)
+        public static void RemoveAllData(TdDomainContext context)
         {
             context.UserSettings.RemoveRange(context.UserSettings);
             context.TicketTags.RemoveRange(context.TicketTags);
+            context.TicketEventNotifications.RemoveRange(context.TicketEventNotifications);
+            context.TicketSubscribers.RemoveRange(context.TicketSubscribers);
             context.TicketEvents.RemoveRange(context.TicketEvents);
             context.Tickets.RemoveRange(context.Tickets);
-            
             context.TicketDeskSettings = new ApplicationSetting();
-          
+
             context.SaveChanges();
         }
 
-        public static void SetupDemoData(TicketDeskContext context)
+        public static void SetupDemoData(TdDomainContext context)
         {
             RemoveAllData(context);
             context.SaveChanges();
 
-          
-          
+
+
 
 
             context.Tickets.AddOrUpdate(t => t.Title,
@@ -58,8 +60,9 @@ namespace TicketDesk.Domain.Migrations
                        Owner = "17f78f38-fa68-445f-90de-38896140db28",
                        Priority = "Low",
                        TagList = "test,moretest",
+                       TicketTags = new List<TicketTag> { new TicketTag() { TagName = "test" }, { new TicketTag() { TagName = "moretest" } } },
                        TicketType = "Problem",
-                       TicketEvents = new[] {TicketEvent.CreateActivityEvent("17f78f38-fa68-445f-90de-38896140db28",TicketActivity.Create, null,null,null)}
+                       TicketEvents = new[] { TicketEvent.CreateActivityEvent("17f78f38-fa68-445f-90de-38896140db28", TicketActivity.Create, null, null, null) }
 
                    });
 
@@ -105,6 +108,7 @@ namespace TicketDesk.Domain.Migrations
                         Owner = oo,
                         Priority = "Low",
                         TagList = "test,moretest",
+                        TicketTags = new List<TicketTag> { new TicketTag() { TagName = "test" }, { new TicketTag() { TagName = "moretest" } } },
                         TicketType = tt,
                         TicketEvents = new[] { TicketEvent.CreateActivityEvent(oo, TicketActivity.Create, null, null, null) }
                     });

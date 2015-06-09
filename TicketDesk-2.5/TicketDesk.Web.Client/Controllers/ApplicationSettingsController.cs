@@ -25,17 +25,17 @@ namespace TicketDesk.Web.Client.Controllers
     [Authorize(Roles = "TdAdministrators")]
     public class ApplicationSettingsController : Controller
     {
-        private TicketDeskContext Context { get; set; }
+        private TdDomainContext Context { get; set; }
         private bool IsAzureSearchDetected { get; set; }
-        public ApplicationSettingsController(TicketDeskContext context)
+        public ApplicationSettingsController(TdDomainContext context)
         {
             Context = context;
-            IsAzureSearchDetected = TicketDeskSearchContext.Current.IndexManager.GetType() == typeof(AzureIndexProvider);
+            IsAzureSearchDetected = TdSearchContext.Current.IndexManager.GetType() == typeof(AzureIndexProvider);
         }
 
         public ActionResult Index()
         {
-            var dbSetting = Context.ApplicationSettings.First(s => s.ApplicationName == "TicketDesk");
+            var dbSetting = Context.TicketDeskSettings;
             ViewBag.IsAzureSearchEnabled = IsAzureSearchDetected;
             return View(dbSetting);
         }
@@ -48,7 +48,7 @@ namespace TicketDesk.Web.Client.Controllers
             [ModelBinder(typeof(CommaSeparatedModelBinder))] string[] priorities
             )
         {
-            var dbSetting = Context.ApplicationSettings.First(s => s.ApplicationName == "TicketDesk");
+            var dbSetting = Context.TicketDeskSettings;
             if (ModelState.IsValid && TryUpdateModel(dbSetting))
             {
                 dbSetting.SelectLists.CategoryList = categories.ToList();

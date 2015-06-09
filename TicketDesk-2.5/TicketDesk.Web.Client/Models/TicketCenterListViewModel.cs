@@ -22,33 +22,28 @@ namespace TicketDesk.Web.Client.Models
 {
     public class TicketCenterListViewModel
     {
-        public static async Task<TicketCenterListViewModel> GetViewModelAsync(int currentPage, string listName, TicketDeskContext context, string userId)
+        private FilterBarViewModel _filterBar;
+
+        public static async Task<TicketCenterListViewModel> GetViewModelAsync(int currentPage, string listName, TdDomainContext context, string userId)
         {
-            var vm = new TicketCenterListViewModel(currentPage, listName, context, userId);
+            var vm = new TicketCenterListViewModel()
+            {
+                UserListSettings =
+                    (await context.UserSettingsManager.GetUserListSettings(userId)).OrderBy(
+                        lp => lp.ListMenuDisplayOrder),
+                CurrentPage = currentPage,
+                CurrentListSetting = await context.UserSettingsManager.GetUserListSettingByName(listName, userId)
+            };
+
             vm.Tickets = await vm.ListTicketsAsync(currentPage, context);
+
             return vm;
         }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="TicketCenterListViewModel" /> class.
         /// </summary>
-        /// <param name="currentPage">The current page.</param>
-        /// <param name="listName">Name of the list.</param>
-        /// <param name="context">The context.</param>
-        /// <param name="userId">The user identifier.</param>
-        private TicketCenterListViewModel(int currentPage, string listName, TicketDeskContext context, string userId)
-        {
-            UserListSettings = context.UserSettings.GetUserListSettings(userId).OrderBy(lp => lp.ListMenuDisplayOrder);
-            CurrentPage = currentPage;
-            if (string.IsNullOrEmpty(listName))
-            {
-                listName = UserListSettings.First().ListName;
-            }
-            CurrentListSetting = context.UserSettings.GetUserListSettingByName(listName, userId);
-
-            FilterBar = new FilterBarViewModel(CurrentListSetting);
-
-        }
+        private TicketCenterListViewModel() { }//private ctor
 
         public int CurrentPage { get; set; }
 
@@ -57,21 +52,15 @@ namespace TicketDesk.Web.Client.Models
             get { return DependencyResolver.Current.GetService<TicketDeskUserManager>(); }
         }
 
-        public Task<IPagedList<Ticket>> ListTicketsAsync(int pageIndex, TicketDeskContext context)
+        public Task<IPagedList<Ticket>> ListTicketsAsync(int pageIndex, TdDomainContext context)
         {
             var filterColumns = CurrentListSetting.FilterColumns.ToList();
             var sortColumns = CurrentListSetting.SortColumns.ToList();
-
             var pageSize = CurrentListSetting.ItemsPerPage;
-
-
-
             var query = context.GetObjectQueryFor(context.Tickets);
-
 
             query = filterColumns.ApplyToQuery(query);
             query = sortColumns.ApplyToQuery(query);
-
 
             return query.ToPagedListAsync(pageIndex, pageSize);
         }
@@ -80,7 +69,10 @@ namespace TicketDesk.Web.Client.Models
         /// Gets or (private) sets the filter bar model.
         /// </summary>
         /// <value>The filter bar.</value>
-        public FilterBarViewModel FilterBar { get; private set; }
+        public FilterBarViewModel FilterBar
+        {
+            get { return _filterBar ?? (_filterBar = new FilterBarViewModel(CurrentListSetting)); }
+        }
 
 
         /// <summary>

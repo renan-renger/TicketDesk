@@ -12,6 +12,7 @@
 // provided to the recipient.
 
 using System;
+using System.Configuration;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
@@ -23,18 +24,24 @@ using TicketDesk.IO;
 namespace TicketDesk.Web.Client.Controllers
 {
     [RoutePrefix("file")]
-    [Authorize]
+    [Authorize(Roles = "TdInternalUsers,TdHelpDeskUsers,TdAdministrators")]
     public class FileController : Controller
     {
         [HttpPost]
         [Route("upload")]
         public async Task<ActionResult> Upload(Guid tempId)
         {
+            var demoMode = (ConfigurationManager.AppSettings["ticketdesk:DemoModeEnabled"] ?? "false").Equals("true", StringComparison.InvariantCultureIgnoreCase);
+            if (demoMode)
+            {
+                return new EmptyResult();
+            }
             //TODO: doesn't necessarily play well with large files, cap file upload size to something reasonable (define in settings) or use upload chunking
             foreach (string fileName in Request.Files)
             {
                 var file = Request.Files[fileName];
                 Debug.Assert(file != null, "file != null");
+                
                 await TicketDeskFileStore.SaveAttachmentAsync(file.InputStream, file.FileName, tempId.ToString(), true);
             }
             return Json(new { Message = string.Empty });//dropzone expects a message property back

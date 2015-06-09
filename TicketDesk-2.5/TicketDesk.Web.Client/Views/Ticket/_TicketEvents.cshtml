@@ -13,12 +13,30 @@
     provided to the recipient.
 *@
 
-@using TicketDesk.Web.Client.Models
-@model IEnumerable<TicketDesk.Domain.Model.TicketEvent>
+@using Microsoft.AspNet.Identity
+@using TicketDesk.Domain.Model
+@model IEnumerable<TicketEvent>
 
 @foreach (var evt in Model.OrderByDescending(c => c.EventDate))
 {
-    <div>@evt.GetEventByInfo().DisplayName @evt.EventDescription</div>
-    <div>@evt.HtmlComment()</div>
-    <hr />
+    var userId = User.Identity.GetUserId();
+    
+    var pnlType = (evt.EventBy == userId)? "panel-success": "panel-default";
+    <div class="panel panel-default">
+        <div class="panel-heading"  style="padding: 5px;">
+            <div><strong>@evt.GetEventByInfo().DisplayName</strong> @evt.EventDescription</div>
+
+            <div class="text-muted small" style="text-indent: 1em;">
+                @evt.EventDate.Date.ToLongDateString()
+                @evt.EventDate.Date.ToShortTimeString()
+            </div>
+        </div>
+        @{
+            var cmt = evt.HtmlComment();
+            if (!string.IsNullOrEmpty(cmt.ToString()))
+            {
+                <div class="panel-body" style="padding: 5px;">@cmt</div>
+            }
+        }
+    </div>
 }

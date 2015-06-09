@@ -21,11 +21,11 @@ namespace TicketDesk.Web.Client.Controllers
 {
     [RoutePrefix("search")]
     [Route("{action=index")]
-    [Authorize]
+    [Authorize(Roles = "TdInternalUsers,TdHelpDeskUsers,TdAdministrators")]
     public class SearchController : Controller
     {
-        private TicketDeskContext Context { get; set; }
-        public SearchController(TicketDeskContext context)
+        private TdDomainContext Context { get; set; }
+        public SearchController(TdDomainContext context)
         {
             Context = context;
         }
@@ -37,7 +37,7 @@ namespace TicketDesk.Web.Client.Controllers
         {
             if (!string.IsNullOrEmpty(term))
             {
-                var model = await TicketDeskSearchContext.Current.SearchAsync(Context.Tickets, term);
+                var model = await TdSearchContext.Current.SearchAsync(Context.Tickets, term);
                 return View(model);
             }
             return View(new Ticket[0]);

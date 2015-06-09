@@ -23,19 +23,30 @@ namespace TicketDesk.Web.Client.Controllers
 {
     [RoutePrefix("tickets")]
     [Route("{action=index}")]
-    [Authorize]
+    [Authorize(Roles = "TdInternalUsers,TdHelpDeskUsers,TdAdministrators")]
     public class TicketCenterController : Controller
     {
-        private TicketDeskContext Context { get; set; }
-        public TicketCenterController(TicketDeskContext context)
+        private TdDomainContext Context { get; set; }
+        public TicketCenterController(TdDomainContext context)
         {
             Context = context;
         }
 
+        [Route("reset-user-lists")]
+        public async Task<ActionResult> ResetUserLists()
+        {
+            var uId = User.Identity.GetUserId();
+            await Context.UserSettingsManager.ResetAllListSettingsForUser(uId);
+            var x = await Context.SaveChangesAsync();
+            return RedirectToAction("Index");
+
+        }
+
         // GET: TicketCenter
-        [Route("{listName=mytickets}/{page:int?}")]
+        [Route("{listName?}/{page:int?}")]
         public async Task<ActionResult> Index(int? page, string listName)
         {
+            listName = listName ?? (Context.SecurityProvider.IsTdHelpDeskUser ? "unassigned" : "mytickets");
             var pageNumber = page ?? 1;
 
             var viewModel = await TicketCenterListViewModel.GetViewModelAsync(pageNumber, listName, Context, User.Identity.GetUserId());//new TicketCenterListViewModel(listName, model, Context, User.Identity.GetUserId());
@@ -59,7 +70,7 @@ namespace TicketDesk.Web.Client.Controllers
             string assignedTo)
         {
             var uId = User.Identity.GetUserId();
-            var userSetting = Context.UserSettings.GetUserSetting(uId);
+            var userSetting = await Context.UserSettingsManager.GetSettingsForUser(uId);
 
             var currentListSetting = userSetting.GetUserListSettingByName(listName);
 
@@ -79,7 +90,7 @@ namespace TicketDesk.Web.Client.Controllers
             bool isMultiSort = false)
         {
             var uId = User.Identity.GetUserId();
-            var userSetting = Context.UserSettings.GetUserSetting(uId);
+            var userSetting = await Context.UserSettingsManager.GetSettingsForUser(uId);
             var currentListSetting = userSetting.GetUserListSettingByName(listName);
 
             var sortCol = currentListSetting.SortColumns.SingleOrDefault(sc => sc.ColumnName == columnName);
@@ -115,6 +126,7 @@ namespace TicketDesk.Web.Client.Controllers
 
             return await GetTicketListPartial(page, listName);
         }
+
 
 
         private async Task<PartialViewResult> GetTicketListPartial(int? page, string listName)

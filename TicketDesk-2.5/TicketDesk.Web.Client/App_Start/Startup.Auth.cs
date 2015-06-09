@@ -12,7 +12,6 @@
 // provided to the recipient.
 
 using System;
-using System.Configuration;
 using Microsoft.AspNet.Identity;
 using Microsoft.AspNet.Identity.Owin;
 using Microsoft.Owin;
@@ -20,7 +19,7 @@ using Microsoft.Owin.Security.Cookies;
 using Owin;
 using SimpleInjector;
 using TicketDesk.Web.Identity;
-using TicketDesk.Web.Identity.Infrastructure;
+using TicketDesk.Web.Identity.Migrations;
 using TicketDesk.Web.Identity.Model;
 
 namespace TicketDesk.Web.Client
@@ -30,13 +29,18 @@ namespace TicketDesk.Web.Client
         // For more information on configuring authentication, please visit http://go.microsoft.com/fwlink/?LinkId=301864
         public void ConfigureAuth(IAppBuilder app, Container container)
         {
-            //non-IoC stuff... no longer needed, but here for reference.
-            //app.CreatePerOwinContext(TicketDeskIdentityContext.Create);
-            //app.CreatePerOwinContext<TicketDeskUserManager>(TicketDeskUserManager.Create);
-            //app.CreatePerOwinContext<TicketDeskRoleManager>(TicketDeskRoleManager.Create);
-            //app.CreatePerOwinContext<TicketDeskSignInManager>(TicketDeskSignInManager.Create);
-            
-            app.CreatePerOwinContext(container.GetInstance<TicketDeskUserManager>);
+            //app.createperowincontext stuff is now done by simpleinjector instead.
+            //  It is worth noting that CreatePerOwinContext has one fatal down-side... it WILL 
+            //  create an instance for each owin context, even if nothing ever attempts to get
+            //  that instance... in TD's case, this causes things like the user manager to try
+            //  to instantiate, even if we're in first-run-setup mode and don't have a database
+            //  available yet. 
+
+                //app.CreatePerOwinContext(TicketDeskIdentityContext.Create);
+                //app.CreatePerOwinContext<TicketDeskUserManager>(TicketDeskUserManager.Create);
+                //app.CreatePerOwinContext<TicketDeskRoleManager>(TicketDeskRoleManager.Create);
+                //app.CreatePerOwinContext<TicketDeskSignInManager>(TicketDeskSignInManager.Create);
+                //app.CreatePerOwinContext(container.GetInstance<TicketDeskUserManager>);
             
             // Enable the application to use a cookie to store information for the signed in user
             // and to use a cookie to temporarily store information about a user logging in with a third party login provider
@@ -84,15 +88,11 @@ namespace TicketDesk.Web.Client
             //    ClientSecret = ""
             //});
 
-            
-            var demoRefresh = ConfigurationManager.AppSettings["ticketdesk:ResetDemoDataOnStartup"];
-            var firstRunDemoRefresh = !string.IsNullOrEmpty(demoRefresh) &&
-                demoRefresh.Equals("true", StringComparison.InvariantCultureIgnoreCase) &&
-                DatabaseConfig.IsDatabaseReady;//only do this if database was ready on startup, otherwise migrator will take care of it
 
-            if (firstRunDemoRefresh)
+
+            if (DatabaseConfig.IsFirstRunDemoRefreshEnabled())
             {
-                DemoIdentityDataManager.SetupDemoIdentityData(container.GetInstance<TicketDeskIdentityContext>());
+                DemoIdentityDataManager.SetupDemoIdentityData(container.GetInstance<TdIdentityContext>());
             }
 
         }

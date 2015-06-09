@@ -30,6 +30,7 @@ using SimpleInjector.Advanced;
 using SimpleInjector.Integration.Web;
 using SimpleInjector.Integration.Web.Mvc;
 using TicketDesk.Domain;
+using TicketDesk.PushNotifications;
 using TicketDesk.Web.Identity;
 using TicketDesk.Web.Identity.Model;
 
@@ -59,18 +60,22 @@ namespace TicketDesk.Web.Client
 
             container.RegisterPerWebRequest<TicketDeskContextSecurityProvider>();
 
+            container.Register(() => new TdPushNotificationContext(), hybridLifestyle);
+
             container.Register(() => HttpContext.Current != null ?
-                    new TicketDeskContext(container.GetInstance<TicketDeskContextSecurityProvider>()) :
-                    new TicketDeskContext(),
+                    new TdDomainContext(container.GetInstance<TicketDeskContextSecurityProvider>()) :
+                    new TdDomainContext(),
                 hybridLifestyle);
 
-            container.RegisterPerWebRequest<TicketDeskIdentityContext>();
+            container.Register(() => new TdIdentityContext(), hybridLifestyle);
 
-            container.RegisterPerWebRequest<IUserStore<TicketDeskUser>>(() =>
-                new UserStore<TicketDeskUser>(container.GetInstance<TicketDeskIdentityContext>()));
+            container.Register<IUserStore<TicketDeskUser>>(() =>
+                new UserStore<TicketDeskUser>(container.GetInstance<TdIdentityContext>()), 
+                hybridLifestyle);
 
-            container.RegisterPerWebRequest<IRoleStore<IdentityRole, string>>(() =>
-                new RoleStore<IdentityRole>(container.GetInstance<TicketDeskIdentityContext>()));
+            container.Register<IRoleStore<IdentityRole, string>>(() =>
+                new RoleStore<IdentityRole>(container.GetInstance<TdIdentityContext>()), 
+                hybridLifestyle);
 
 
             container.RegisterPerWebRequest(() =>
@@ -106,6 +111,7 @@ namespace TicketDesk.Web.Client
 
             return container;
         }
+
 
 
         private void InitializeUserManager(TicketDeskUserManager manager, IAppBuilder app)

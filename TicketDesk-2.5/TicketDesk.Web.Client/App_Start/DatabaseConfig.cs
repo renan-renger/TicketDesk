@@ -39,15 +39,12 @@ namespace TicketDesk.Web.Client
             }
             else
             {
-                var demoRefresh = ConfigurationManager.AppSettings["ticketdesk:ResetDemoDataOnStartup"];
-                var firstRunDemoRefresh = !string.IsNullOrEmpty(demoRefresh) &&
-                    demoRefresh.Equals("true", StringComparison.InvariantCultureIgnoreCase) &&
-                    IsDatabaseReady;//only do this if database was ready on startup, otherwise migrator will take care of it
+
 
                 //run any pending migrations automatically to bring the DB up to date
                 Database.SetInitializer(
-                    new MigrateDatabaseToLatestVersion<TicketDeskContext, Configuration>(true));
-                using (var ctx = new TicketDeskContext(null))
+                    new MigrateDatabaseToLatestVersion<TdDomainContext, Configuration>(true));
+                using (var ctx = new TdDomainContext(null))
                 {
                     try
                     {
@@ -57,7 +54,7 @@ namespace TicketDesk.Web.Client
                     {
                         ctx.Database.Initialize(true);
                     }
-                    if (firstRunDemoRefresh)
+                    if (IsFirstRunDemoRefreshEnabled())
                     {
                         DemoDataManager.SetupDemoData(ctx);
                     }
@@ -65,14 +62,15 @@ namespace TicketDesk.Web.Client
             }
         }
 
-        
+
+
 
         public static bool IsDatabaseReady
         {
             get
             {
                 bool result;
-                using (var ctx = new TicketDeskContext(null))
+                using (var ctx = new TdDomainContext(null))
                 {
 
                     result = (ctx.Database.Exists() && !IsEmptyDatabase(ctx)) && !IsLegacyDatabase(ctx);
@@ -84,7 +82,7 @@ namespace TicketDesk.Web.Client
 
         public static bool IsEmptyDatabase()
         {
-            using (var ctx = new TicketDeskContext(null))
+            using (var ctx = new TdDomainContext(null))
             {
                 return IsEmptyDatabase(ctx);
             }
@@ -92,7 +90,7 @@ namespace TicketDesk.Web.Client
 
         public static bool IsLegacyDatabase()
         {
-            using (var ctx = new TicketDeskContext(null))
+            using (var ctx = new TdDomainContext(null))
             {
                 return IsLegacyDatabase(ctx);
             }
@@ -100,10 +98,20 @@ namespace TicketDesk.Web.Client
 
         public static bool HasLegacySecurity()
         {
-            using (var ctx = new TicketDeskContext(null))
+            using (var ctx = new TdDomainContext(null))
             {
                 return HasLegacySecurity(ctx);
             }
+        }
+
+        public static bool IsFirstRunDemoRefreshEnabled()
+        {
+            var demoRefresh = ConfigurationManager.AppSettings["ticketdesk:ResetDemoDataOnStartup"];
+            var firstRunDemoRefresh = !string.IsNullOrEmpty(demoRefresh) &&
+                                      demoRefresh.Equals("true", StringComparison.InvariantCultureIgnoreCase) &&
+                                      IsDatabaseReady;
+            //only do this if database was ready on startup, otherwise migrator will take care of it
+            return firstRunDemoRefresh;
         }
 
         private static bool IsEmptyDatabase(DbContext context)
@@ -139,11 +147,23 @@ namespace TicketDesk.Web.Client
             var isLegacy = false;
             try
             {
-                var oldVersion =
-                    context.Database.SqlQuery<string>("select SettingValue from Settings where SettingName = 'Version'");
-                isLegacy = (oldVersion != null && oldVersion.Any() && oldVersion.First().Equals("2.0.2"));
+                var isTable = context.Database.SqlQuery<int>(@"(SELECT COUNT(TABLE_NAME) 
+                                                                  FROM INFORMATION_SCHEMA.TABLES 
+                                                                  WHERE TABLE_SCHEMA = 'dbo' 
+                                                                  AND TABLE_NAME = 'Settings')");
+                if (isTable.Any())
+                {
+                    var it = isTable.First();
+                    if (it > 0)
+                    {
+                        var oldVersion =
+                            context.Database.SqlQuery<string>(
+                                "select SettingValue from Settings where SettingName = 'Version'");
+                        isLegacy = (oldVersion.Any() && oldVersion.First().Equals("2.0.2"));
+                    }
+                }
             }
-            // ReSharper disable once EmptyGeneralCatchClause
+                // ReSharper disable once EmptyGeneralCatchClause
             catch
             {
                 //eat any exception, we'll assume that if the db exists, but we can't read the settings, then it is an just empty new db

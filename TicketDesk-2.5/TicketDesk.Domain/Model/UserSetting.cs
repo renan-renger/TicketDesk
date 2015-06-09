@@ -11,6 +11,7 @@
 // attribution must remain intact, and a copy of the license must be 
 // provided to the recipient.
 
+using System;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
 
@@ -19,24 +20,24 @@ namespace TicketDesk.Domain.Model
     
     public class UserSetting
     {
+
         [Key]
         [StringLength(256)]
         public string UserId { get; set; }
 
-
-        public virtual UserTicketListSettingsCollection ListSettings { get; set; }
+        public virtual UserTicketListSettingsCollection ListSettings { get; internal set; }
        
 
         public UserTicketListSetting GetUserListSettingByName(string listName)
         {
-            return ListSettings.FirstOrDefault(us => us.ListName == listName);
+            return ListSettings.FirstOrDefault(us => us.ListName.Equals(listName, StringComparison.InvariantCultureIgnoreCase));
         }
 
-        public static UserSetting GetDefaultSettingsForUser(string userId)
+        public static UserSetting GetDefaultSettingsForUser(string userId, bool isHelpDeskUser)
         {
             var collection = new UserTicketListSettingsCollection
             {
-                UserTicketListSetting.GetDefaultListSettings(userId)
+                UserTicketListSetting.GetDefaultListSettings(userId, isHelpDeskUser)
             };
 
             return new UserSetting { UserId = userId, ListSettings = collection };

@@ -26,12 +26,7 @@ namespace TicketDesk.Search.Azure
     public class AzureIndexProvider : AzureSearchConector, ISearchIndexProvider
     {
         private const string IndexName = "ticketdesk-searchindex";
-        private AzureQueueProvider Queue { get; set; }
-        public AzureIndexProvider()
-        {
-            Queue = new AzureQueueProvider();
-            
-        }
+
 
         /// <summary>
         /// Gets a value indicating whether this provider is correctly configured and available for use.
@@ -55,12 +50,6 @@ namespace TicketDesk.Search.Azure
         }
 
         public async Task<bool> AddItemsToIndexAsync(IEnumerable<SearchIndexItem> items)
-        {
-            await Queue.EnqueueItemsAsync(items);
-            return true;
-        }
-
-        public async Task<bool> SendItemsToIndexAsync(IEnumerable<SearchIndexItem> items)
         {
             var ret = true;
             foreach (var item in items)
@@ -194,7 +183,5 @@ namespace TicketDesk.Search.Azure
             index.DefaultScoringProfile = "fieldBooster";
             return index;
         }
-
-
     }
 }

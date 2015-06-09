@@ -27,11 +27,11 @@ namespace TicketDesk.Web.Client.Controllers
     /// </summary>
     [RoutePrefix("ticket")]
     [Route("{action=index}")]
-    [Authorize]
+    [Authorize(Roles = "TdInternalUsers,TdHelpDeskUsers,TdAdministrators")]
     public class TicketController : Controller
     {
-        private TicketDeskContext Context { get; set; }
-        public TicketController(TicketDeskContext context)
+        private TdDomainContext Context { get; set; }
+        public TicketController(TdDomainContext context)
         {
             Context = context;
         }
@@ -45,10 +45,15 @@ namespace TicketDesk.Web.Client.Controllers
         public async Task<ActionResult> Index(int id)
         {
             var model = await Context.Tickets.FindAsync(id);
+            if (model == null)
+            {
+                return RedirectToAction("Index", "TicketCenter");
+            }
+
             return View(model);
         }
 
-        [Authorize(Roles = "TdInternalUsers")]
+       
         [Route("new")]
         public ActionResult New()
         {
@@ -73,9 +78,9 @@ namespace TicketDesk.Web.Client.Controllers
                     }
                 }
                 // ReSharper disable once EmptyGeneralCatchClause
-                catch (DbEntityValidationException ex)
+                catch (DbEntityValidationException)
                 {
-                    var test = false;
+                    
                     //TODO: catch rule exceptions? or can annotations handle this fully now?
                 }
 
@@ -84,7 +89,13 @@ namespace TicketDesk.Web.Client.Controllers
             return View(ticket);
         }
 
-        
+        [Route("ticket-files")]
+        public ActionResult TicketFiles(int ticketId)
+        {
+            var attachments = TicketDeskFileStore.ListAttachmentInfo(ticketId.ToString(CultureInfo.InvariantCulture), false);
+            ViewBag.TicketId = ticketId;
+            return PartialView("_TicketFiles", attachments);
+        }
 
         [Route("ticket-events")]
         public async Task<ActionResult> TicketEvents(int ticketId)
@@ -98,7 +109,6 @@ namespace TicketDesk.Web.Client.Controllers
         {
             var ticket = await Context.Tickets.FindAsync(ticketId);
 
-            ViewBag.Attachments = TicketDeskFileStore.ListAttachmentInfo(ticketId.ToString(CultureInfo.InvariantCulture), false);
 
             return PartialView("_TicketDetails", ticket);
         }

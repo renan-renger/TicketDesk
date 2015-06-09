@@ -13,60 +13,13 @@
 
 using System;
 using System.Collections.Generic;
-using System.Data.Entity;
 using System.Data.Entity.Core.Objects;
 using System.Linq;
-
 
 namespace TicketDesk.Domain.Model
 {
     public static class UserSettingExtensions
     {
-        /// <summary>
-        /// Gets the user list setting by name.
-        /// </summary>
-        /// <param name="settings">The settings.</param>
-        /// <param name="listName">Name of the list.</param>
-        /// <param name="userId">The user identifier.</param>
-        /// <returns>UserTicketListSetting.</returns>
-        public static UserTicketListSetting GetUserListSettingByName(this DbSet<UserSetting> settings, string listName, string userId)
-        {
-            return GetUserSetting(settings, userId).GetUserListSettingByName(listName);
-            //return GetUserSettings(settings, userId).ListSettings.FirstOrDefault(us => us.ListName == listName);
-        }
-
-
-        /// <summary>
-        /// Gets all user list settings.
-        /// </summary>
-        /// <param name="settings">The settings.</param>
-        /// <param name="userId">The user identifier.</param>
-        /// <returns>ICollection{UserTicketListSetting}.</returns>
-        public static ICollection<UserTicketListSetting> GetUserListSettings(this DbSet<UserSetting> settings,
-            string userId)
-        {
-            return GetUserSetting(settings, userId).ListSettings;
-
-        }
-
-        /// <summary>
-        /// Gets the user settings.
-        /// </summary>
-        /// <param name="settings">The settings.</param>
-        /// <param name="userId">The user identifier.</param>
-        /// <returns>UserSetting.</returns>
-        public static UserSetting GetUserSetting(this DbSet<UserSetting> settings, string userId)
-        {
-            var usetting = settings.FirstOrDefault(us => us.UserId == userId);
-            if (usetting == null)
-            {
-                usetting = UserSetting.GetDefaultSettingsForUser(userId);
-                settings.Add(usetting);//if and when saves are made to the db, these will be included  
-            }
-            return usetting;
-        }
-
-
         /// <summary>
         /// Applies the current sort column settings to an esql object query dynamically.
         /// </summary>
@@ -108,26 +61,38 @@ namespace TicketDesk.Domain.Model
                 var fParams = new ObjectParameter[filterColumns.Count];
                 for (var i = 0; i < filterColumns.Count; i++)
                 {
+                    string optr;
                     var filterColumn = filterColumns[i];
 
-                    var optr = (filterColumn.UseEqualityComparison.HasValue && !filterColumn.UseEqualityComparison.Value) ? "!=" : "=";
+                    if (filterColumn.ColumnValue == DBNull.Value)
+                    {
+                        optr = (filterColumn.UseEqualityComparison.HasValue && !filterColumn.UseEqualityComparison.Value)
+                            ? "IS NOT"
+                            : "IS";
+                    }
+                    else
+                    {
+                        optr = (filterColumn.UseEqualityComparison.HasValue && !filterColumn.UseEqualityComparison.Value)
+                            ? "!="
+                            : "=";
+                    }
 
                     fkeys[i] = string.Format("it.{0} {1} {2}", filterColumn.ColumnName, optr, "@" + filterColumn.ColumnName);
-
 
                     //most of the time esql works with whatever type of param value you pass in, but
                     // enums in our collection are serialized to/from json as integers.
                     // Check if enum, and explicitly convert int value to the correct enum value
-                    if (filterColumn.ColumnValueType.IsEnum)
+                    if (filterColumn.ColumnValueType != null && filterColumn.ColumnValueType.IsEnum)
                     {
                         filterColumn.ColumnValue = Enum.Parse(filterColumn.ColumnValueType, filterColumn.ColumnValue.ToString());
                     }
-
                     //assigning the type in ctor, then value directly as a param works around issues when the colum val is null.
+
                     fParams[i] = new ObjectParameter(filterColumn.ColumnName, filterColumn.ColumnValueType)
                     {
                         Value = filterColumn.ColumnValue
                     };
+
                 }
 
                 var wString = string.Join(" and ", fkeys);

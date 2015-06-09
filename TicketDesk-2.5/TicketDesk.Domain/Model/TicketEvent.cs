@@ -41,7 +41,7 @@ namespace TicketDesk.Domain.Model
         [StringLength(500)]
         public string EventDescription { get; set; }
 
-        [Column(TypeName = "ntext")]
+        
         public string Comment { get; set; }
 
         public bool IsHtml { get; set; }
@@ -61,7 +61,7 @@ namespace TicketDesk.Domain.Model
 
         public virtual Ticket Ticket { get; set; }
 
-        public virtual ICollection<TicketEventNotification> TicketEventNotifications { get; set; } 
+        public virtual ICollection<TicketEventNotification> TicketEventNotifications { get; set; }
 
 
         /// <summary>
@@ -89,6 +89,26 @@ namespace TicketDesk.Domain.Model
                 IsHtml = false
             };
             return tc;
+        }
+
+        /// <summary>
+        /// Creates the event notifications for each ticket subscriber and adds them to the TicketEventNotifications collection.
+        /// </summary>
+        public void CreateSubscriberEventNotifications()
+        {
+            foreach (var subscriber in Ticket.TicketSubscribers)
+            {
+                var isSubscriberEvent = EventBy == subscriber.SubscriberId;
+
+                TicketEventNotifications.Add(
+                    new TicketEventNotification
+                    {
+                        IsNew = !isSubscriberEvent,
+                        IsRead = isSubscriberEvent,
+                        SubscriberId = subscriber.SubscriberId,
+                    });
+
+            }
         }
     }
 }

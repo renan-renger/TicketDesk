@@ -12,6 +12,7 @@
 // provided to the recipient.
 
 using System;
+using System.Configuration;
 using System.Globalization;
 using System.Linq;
 using System.Security;
@@ -24,14 +25,13 @@ using TicketDesk.IO;
 
 namespace TicketDesk.Web.Client.Controllers
 {
-    [Authorize]
     [RoutePrefix("ticket-activity")]
     [Route("{action}")]
+    [Authorize(Roles = "TdInternalUsers,TdHelpDeskUsers,TdAdministrators")]
     public class TicketActivityController : Controller
     {
-
-        private TicketDeskContext Context { get; set; }
-        public TicketActivityController(TicketDeskContext context)
+        private TdDomainContext Context { get; set; }
+        public TicketActivityController(TdDomainContext context)
         {
             Context = context;
         }
@@ -54,7 +54,6 @@ namespace TicketDesk.Web.Client.Controllers
             var activities = Context.TicketActions.GetValidTicketActivities(ticket);
             return PartialView("_ActivityButtons", activities);
         }
-
 
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -133,44 +132,53 @@ namespace TicketDesk.Web.Client.Controllers
         [Route("modify-attachments")]
         public async Task<ActionResult> ModifyAttachments(int ticketId, string comment, Guid tempId, string deleteFiles)
         {
+            var demoMode = (ConfigurationManager.AppSettings["ticketdesk:DemoModeEnabled"] ?? "false").Equals("true", StringComparison.InvariantCultureIgnoreCase);
+            if (demoMode)
+            {
+                return new EmptyResult();
+            }
             //most of this action is performed directly against the storage provider, outside the business domain's control. 
             //  All the business domain has to do is record the activity log and comments
-            Action<Ticket> activityFn =  ticket =>
-            {
-                
+            Action<Ticket> activityFn = ticket =>
+           {
                 //TODO: it might make sense to move the string building part of this over to the TicketDeskFileStore too?
                 var sb = new StringBuilder(comment);
-                if (!string.IsNullOrEmpty(deleteFiles))
-                {
-                    sb.AppendLine();
-                    sb.AppendLine("<pre>");
-                    sb.AppendLine("Removed Files:");
-                    var files = deleteFiles.Split(',');
-                    foreach (var file in files)
-                    {
-                        TicketDeskFileStore.DeleteAttachment(file, ticketId.ToString(CultureInfo.InvariantCulture), false);
-                        sb.AppendLine(string.Format("    {0}", file));
-                    }
-                    sb.AppendLine("</pre>");
-                }
-                var filesAdded = ticket.CommitPendingAttachments(tempId).ToArray();
-                if (filesAdded.Any())
-                {
-                    sb.AppendLine();
-                    sb.AppendLine("<pre>");
-                    sb.AppendLine("New files:");
-                    foreach (var file in filesAdded)
-                    {
-                        sb.AppendLine(string.Format("    {0}", file));
-                    }
-                    sb.AppendLine("</pre>");
-                }
-                comment = sb.ToString();
+               if (!string.IsNullOrEmpty(deleteFiles))
+               {
+                   sb.AppendLine();
+                   sb.AppendLine("<dl><dt>");
+                   sb.AppendLine("Removed Files:");
+                   sb.AppendLine("</dt>");
+
+
+                   var files = deleteFiles.Split(',');
+                   foreach (var file in files)
+                   {
+                       TicketDeskFileStore.DeleteAttachment(file, ticketId.ToString(CultureInfo.InvariantCulture), false);
+                       sb.AppendLine(string.Format("<dd>    {0}</dd>", file));
+                   }
+                   sb.AppendLine("</dl>");
+               }
+               var filesAdded = ticket.CommitPendingAttachments(tempId).ToArray();
+               if (filesAdded.Any())
+               {
+                   sb.AppendLine();
+                   sb.AppendLine("<dl><dt>");
+                   sb.AppendLine("New files:");
+                   sb.AppendLine("</dt>");
+
+                   foreach (var file in filesAdded)
+                   {
+                       sb.AppendLine(string.Format("<dd>    {0}</dd>", file));
+                   }
+                   sb.AppendLine("</dl>");
+               }
+               comment = sb.ToString();
 
                 //perform the simple business domain functions
                 var domainActivityFn = Context.TicketActions.ModifyAttachments(comment);
-                domainActivityFn(ticket);
-            };
+               domainActivityFn(ticket);
+           };
 
             return await PerformTicketAction(ticketId, activityFn, TicketActivity.ModifyAttachments);
         }
@@ -250,7 +258,7 @@ namespace TicketDesk.Web.Client.Controllers
                 }
                 catch (SecurityException ex)
                 {
-                     ModelState.AddModelError("Security", ex);
+                    ModelState.AddModelError("Security", ex);
                 }
                 var result = await Context.SaveChangesAsync(); //save changes catches lastupdatedby and date automatically
                 if (result > 0)
